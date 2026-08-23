@@ -50,7 +50,7 @@ def money(x):
 def main():
     rng = random.Random(SEED)
     os.makedirs(OUT, exist_ok=True)
-    orders, payments, refunds, settlements, bank = [], [], [], [], []
+    orders, payments, refunds, settlements, bank, reserves = [], [], [], [], [], []
     truth = {"order_payment": {}, "payment_settlement": {}, "settlement_bank": {}, "anomalies": []}
 
     def anomaly(kind, ref):
@@ -142,9 +142,11 @@ def main():
     n = len(settlements)
     pool = list(range(n))
     rng.shuffle(pool)
-    missing = set(pool[:PLANT["missing_payout"]])
-    partial = set(pool[PLANT["missing_payout"]:PLANT["missing_payout"] + PLANT["partial_settlement"]])
-    g0 = PLANT["missing_payout"] + PLANT["partial_settlement"]
+    m = PLANT["missing_payout"]
+    partial_list = pool[m:m + PLANT["partial_settlement"]]
+    missing, partial = set(pool[:m]), set(partial_list)
+    reserve_backed = set(partial_list[:3])  # these shortfalls have a documented reserve behind them
+    g0 = m + PLANT["partial_settlement"]
     garbled = set(pool[g0:g0 + PLANT["garbled_ref"]])
 
     bank_seq = 1
@@ -156,8 +158,13 @@ def main():
         bank_seq += 1
         amount, ref, narr = s["net_total"], s["utr"], f"NEFT PAYOUT {s['utr']} RAZORPAY"
         if i in partial:
-            amount = money(s["net_total"] - rng.choice([500, 1200, 2500, 4000]))
+            shortfall = rng.choice([500, 1200, 2500, 4000])
+            amount = money(s["net_total"] - shortfall)
             anomaly("partial_settlement", s["settlement_id"])
+            if i in reserve_backed:
+                reserves.append({"reserve_id": f"RSV-{len(reserves) + 1:05d}", "settlement_id": s["settlement_id"],
+                                 "amount": money(shortfall), "date": s["settled_at"],
+                                 "reason": rng.choice(["Rolling reserve hold", "Dispute reserve", "Risk hold"])})
         elif i in garbled:
             ref, narr = "", "NEFT INWARD SETTLEMENT"  # UTR dropped by the bank feed
         bank.append({"bank_id": bid, "date": s["settled_at"], "amount": amount,
@@ -194,6 +201,7 @@ def main():
     _write("refunds.csv", refunds, ["refund_id", "payment_id", "amount", "created_at", "settlement_id"])
     _write("settlements.csv", settlements, ["settlement_id", "settled_at", "gross_total", "fee_total", "tax_total",
                                             "refund_total", "net_total", "payment_count", "utr"])
+    _write("reserves.csv", reserves, ["reserve_id", "settlement_id", "amount", "reason", "date"])
     _write("bank.csv", bank, ["bank_id", "date", "amount", "type", "ref", "narration"])
     json.dump(truth, open(os.path.join(OUT, "truth.json"), "w"), indent=2)
 

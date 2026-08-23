@@ -1,10 +1,11 @@
-"""End-to-end run: reconcile the books, score against truth, print a report and
-write report.json for the dashboard."""
+"""End-to-end run: reconcile the books, resolve what's safe, score against truth,
+print a report and write report.json for the dashboard."""
 import json
 import os
 import time
 
 from reconcile import load, reconcile
+from resolve import resolve
 from score import score
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -14,24 +15,32 @@ def main():
     data = load()
     t0 = time.perf_counter()
     result = reconcile(*data)
+    result["exceptions"] = resolve(result["exceptions"])
     elapsed = time.perf_counter() - t0
     result["stats"]["seconds"] = round(elapsed, 3)
     result["accuracy"] = score(result["exceptions"])
+
+    ex = result["exceptions"]
+    resolved = [e for e in ex if e["status"] == "resolved"]
+    escalated = [e for e in ex if e["status"] == "escalate"]
+    result["resolution"] = {
+        "auto_resolved": len(resolved),
+        "escalated": len(escalated),
+        "auto_resolution_rate": round(100 * len(resolved) / len(ex), 1) if ex else 0.0,
+        "resolved_without_evidence": sum(1 for e in resolved if not e["evidence"]),
+        "escalated_value": round(sum(e["amount"] for e in escalated), 2),
+    }
     json.dump(result, open(os.path.join(HERE, "report.json"), "w"), indent=2)
 
-    s, a = result["stats"], result["accuracy"]
+    s, a, r = result["stats"], result["accuracy"], result["resolution"]
     print(f"processed {s['records']} records in {s['seconds']}s")
     print(f"reconciled {s['reconciled_pct']}% of value  (Rs {s['reconciled_value']:.0f} of {s['settled_value']:.0f})")
-    print(f"exceptions raised: {s['exceptions']}")
-    print(f"accuracy vs truth -> precision {a['precision']}  recall {a['recall']}  f1 {a['f1']}  "
-          f"(fp {a['false_positive']}, fn {a['false_negative']})")
+    print(f"exceptions {s['exceptions']}  ->  auto-resolved {r['auto_resolved']}  escalated {r['escalated']}  "
+          f"({r['auto_resolution_rate']}% auto, {r['resolved_without_evidence']} resolved without evidence)")
+    print(f"detection accuracy vs truth -> precision {a['precision']}  recall {a['recall']}  f1 {a['f1']}")
     print("per anomaly type (caught/planted):")
     for t, v in a["per_type"].items():
         print(f"  {t:24s} {v['caught']}/{v['planted']}")
-    if a["false_positives"]:
-        print("false positives:", a["false_positives"][:10])
-    if a["missed"]:
-        print("missed:", a["missed"][:10])
 
 
 if __name__ == "__main__":
