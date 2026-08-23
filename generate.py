@@ -1,8 +1,10 @@
 """Build a synthetic but realistic set of books for a payments merchant:
-orders, gateway payments, settlement batches, and a bank statement.
+orders, gateway payments, refunds, settlement batches, and a bank statement.
 
-A hidden ground-truth file records the true links and the anomalies we planted,
-so the reconciler can be scored on real precision/recall instead of guesswork.
+A settlement is not just "payments = bank credit". It nets fee, GST on fee and
+refunds, so the payout is gross - fee - tax - refunds (+/- the odd adjustment).
+A hidden ground-truth file records the true links and the anomalies we plant, so
+the reconciler can be scored on real precision and recall instead of guesswork.
 """
 import csv
 import json
@@ -11,28 +13,32 @@ import random
 from datetime import date, timedelta
 
 SEED = 20260722
-N_ORDERS = 240
+N_ORDERS = 400
+N_REFUNDS = 34
 FEE_RATE = 0.02
-GST_ON_FEE = 0.18
+GST = 0.18
 START = date(2026, 6, 1)
-DAYS = 24
+DAYS = 26
 
-# how many of each anomaly to plant
 PLANT = {
-    "unpaid_order": 14,
-    "pending_settlement": 10,
-    "fee_mismatch": 6,
-    "missing_payout": 3,
-    "unexplained_credit": 4,
-    "duplicate_bank_entry": 3,
-    "refund": 8,
-    "chargeback": 4,
+    "unpaid_order": 20,
+    "pending_settlement": 15,
+    "fee_mismatch": 8,
+    "tax_mismatch": 8,
+    "refund_not_deducted": 8,   # refund exists but the payout didn't net it off
+    "missing_payout": 4,
+    "partial_settlement": 5,    # bank credit smaller than the settlement
+    "unexplained_credit": 6,
+    "duplicate_bank_entry": 4,
+    "chargeback": 6,
+    "garbled_ref": 8,           # not an error - the UTR is missing, tests the matcher
 }
 
 CUSTOMERS = [
     "Aarav Textiles", "Meghna Foods", "Kiran Motors", "Sunrise Pharma", "Bharat Steels",
     "Nimbus Cloud", "Verdant Organics", "Coastal Traders", "Peak Logistics", "Zenith Retail",
     "Orchid Interiors", "Falcon Sports", "Lotus Dairy", "Anand Hardware", "Deccan Books",
+    "Ivory Apparel", "Grand Spices", "Nova Electronics", "Riya Jewellers", "Metro Cafe",
 ]
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -44,47 +50,66 @@ def money(x):
 def main():
     rng = random.Random(SEED)
     os.makedirs(OUT, exist_ok=True)
-
-    orders, payments, settlements, bank = [], [], [], []
+    orders, payments, refunds, settlements, bank = [], [], [], [], []
     truth = {"order_payment": {}, "payment_settlement": {}, "settlement_bank": {}, "anomalies": []}
 
-    unpaid = set(rng.sample(range(N_ORDERS), PLANT["unpaid_order"]))
+    def anomaly(kind, ref):
+        truth["anomalies"].append({"type": kind, "ref": ref})
 
-    # orders
+    unpaid = set(rng.sample(range(N_ORDERS), PLANT["unpaid_order"]))
     for i in range(N_ORDERS):
         oid = f"ORD-{i + 1:05d}"
-        amount = money(rng.choice([499, 999, 1499, 2499, 4999, 7999, 12999, 24999]) + rng.randint(0, 90))
-        created = START + timedelta(days=rng.randint(0, DAYS - 4))
+        amount = money(rng.choice([499, 999, 1499, 2499, 4999, 7999, 12999, 24999]) + rng.randint(0, 95))
+        created = START + timedelta(days=rng.randint(0, DAYS - 5))
         paid = i not in unpaid
-        orders.append({
-            "order_id": oid, "customer": rng.choice(CUSTOMERS), "amount": amount,
-            "created_at": created.isoformat(), "status": "paid" if paid else "unpaid",
-        })
+        orders.append({"order_id": oid, "customer": rng.choice(CUSTOMERS), "amount": amount,
+                       "created_at": created.isoformat(), "status": "paid" if paid else "unpaid"})
         if not paid:
-            truth["anomalies"].append({"type": "unpaid_order", "ref": oid})
+            anomaly("unpaid_order", oid)
 
-    # payments for paid orders
     paid_orders = [o for o in orders if o["status"] == "paid"]
-    pending = set(rng.sample(range(len(paid_orders)), PLANT["pending_settlement"]))
-    fee_bad = set(rng.sample(range(len(paid_orders)), PLANT["fee_mismatch"]))
+    idx = list(range(len(paid_orders)))
+    pending = set(rng.sample(idx, PLANT["pending_settlement"]))
+    fee_bad = set(rng.sample(idx, PLANT["fee_mismatch"]))
+    tax_bad = set(rng.sample(idx, PLANT["tax_mismatch"]))
+
     for j, o in enumerate(paid_orders):
         pid = f"PAY-{j + 1:05d}"
-        fee = money(o["amount"] * FEE_RATE * (1 + GST_ON_FEE))
+        fee = money(o["amount"] * FEE_RATE)
         if j in fee_bad:
-            fee = money(fee + rng.choice([3.5, 5.0, 8.25, -4.0]))  # wrong fee -> net won't tie out
-            truth["anomalies"].append({"type": "fee_mismatch", "ref": pid})
-        net = money(o["amount"] - fee)
+            fee = money(fee + rng.choice([4.0, 6.5, 9.0, -5.0]))
+            anomaly("fee_mismatch", pid)
+        tax = money(fee * GST)
+        if j in tax_bad:
+            tax = money(tax + rng.choice([3.0, 5.5, -2.5, 7.0]))
+            anomaly("tax_mismatch", pid)
+        net = money(o["amount"] - fee - tax)
         cap = date.fromisoformat(o["created_at"]) + timedelta(days=rng.randint(0, 1))
-        payments.append({
-            "payment_id": pid, "order_id": o["order_id"], "gross": o["amount"],
-            "fee": fee, "net": net, "settlement_id": "", "captured_at": cap.isoformat(),
-        })
+        payments.append({"payment_id": pid, "order_id": o["order_id"], "gross": o["amount"],
+                         "fee": fee, "tax": tax, "net": net, "settlement_id": "", "captured_at": cap.isoformat()})
         truth["order_payment"][pid] = o["order_id"]
         if j in pending:
-            truth["anomalies"].append({"type": "pending_settlement", "ref": pid})
+            anomaly("pending_settlement", pid)
 
-    # settle everything not marked pending, grouped by capture day
     settleable = [p for k, p in enumerate(payments) if k not in pending]
+
+    # refunds on settled payments; some deliberately not netted off in the payout
+    refunded = rng.sample(settleable, min(N_REFUNDS, len(settleable)))
+    not_deducted = set()
+    for k, p in enumerate(refunded):
+        rid = f"RFN-{k + 1:05d}"
+        amt = money(p["gross"] * rng.choice([0.3, 0.5, 1.0]))
+        rd = date.fromisoformat(p["captured_at"]) + timedelta(days=rng.randint(1, 3))
+        refunds.append({"refund_id": rid, "payment_id": p["payment_id"], "amount": amt,
+                        "created_at": rd.isoformat(), "settlement_id": ""})
+        if k < PLANT["refund_not_deducted"]:
+            not_deducted.add(rid)
+    bad_ids = {r["refund_id"] for r in refunds if r["refund_id"] in not_deducted}
+    ref_by_payment = {}
+    for r in refunds:
+        ref_by_payment.setdefault(r["payment_id"], []).append(r)
+
+    # settle by capture day
     by_day = {}
     for p in settleable:
         by_day.setdefault(p["captured_at"], []).append(p)
@@ -92,74 +117,88 @@ def main():
     utr_seq = 1
     for i, (day, group) in enumerate(sorted(by_day.items())):
         sid = f"STL-{i + 1:05d}"
-        net_total = money(sum(p["net"] for p in group))
-        settled = date.fromisoformat(day) + timedelta(days=1)
+        group_refunds = [r for p in group for r in ref_by_payment.get(p["payment_id"], [])]
+        gross_total = money(sum(p["gross"] for p in group))
+        fee_total = money(sum(p["fee"] for p in group))
+        tax_total = money(sum(p["tax"] for p in group))
+        deducted = [r for r in group_refunds if r["refund_id"] not in bad_ids]
+        refund_total = money(sum(r["amount"] for r in deducted))
+        net_total = money(gross_total - fee_total - tax_total - refund_total)
         utr = f"UTR{utr_seq:08d}"
         utr_seq += 1
         for p in group:
             p["settlement_id"] = sid
             truth["payment_settlement"][p["payment_id"]] = sid
-        settlements.append({
-            "settlement_id": sid, "settled_at": settled.isoformat(),
-            "payment_count": len(group), "net_total": net_total, "utr": utr,
-        })
+        for r in group_refunds:
+            r["settlement_id"] = sid
+        settlements.append({"settlement_id": sid, "settled_at": (date.fromisoformat(day) + timedelta(days=1)).isoformat(),
+                            "gross_total": gross_total, "fee_total": fee_total, "tax_total": tax_total,
+                            "refund_total": refund_total, "net_total": net_total,
+                            "payment_count": len(group), "utr": utr})
+        if any(r["refund_id"] in bad_ids for r in group_refunds):
+            anomaly("refund_not_deducted", sid)
 
-    # bank credits for settlements, minus a few "missing payouts"
-    missing = set(rng.sample(range(len(settlements)), min(PLANT["missing_payout"], len(settlements))))
+    # bank credits for settlements, with a few missing / partial / garbled-reference payouts
+    n = len(settlements)
+    pool = list(range(n))
+    rng.shuffle(pool)
+    missing = set(pool[:PLANT["missing_payout"]])
+    partial = set(pool[PLANT["missing_payout"]:PLANT["missing_payout"] + PLANT["partial_settlement"]])
+    g0 = PLANT["missing_payout"] + PLANT["partial_settlement"]
+    garbled = set(pool[g0:g0 + PLANT["garbled_ref"]])
+
     bank_seq = 1
     for i, s in enumerate(settlements):
         if i in missing:
-            truth["anomalies"].append({"type": "missing_payout", "ref": s["settlement_id"]})
+            anomaly("missing_payout", s["settlement_id"])
             continue
         bid = f"BNK-{bank_seq:05d}"
         bank_seq += 1
-        bank.append({
-            "bank_id": bid, "date": s["settled_at"], "amount": s["net_total"], "type": "credit",
-            "ref": s["utr"], "narration": f"NEFT PAYOUT {s['utr']} RAZORPAY",
-        })
+        amount, ref, narr = s["net_total"], s["utr"], f"NEFT PAYOUT {s['utr']} RAZORPAY"
+        if i in partial:
+            amount = money(s["net_total"] - rng.choice([500, 1200, 2500, 4000]))
+            anomaly("partial_settlement", s["settlement_id"])
+        elif i in garbled:
+            ref, narr = "", "NEFT INWARD SETTLEMENT"  # UTR dropped by the bank feed
+        bank.append({"bank_id": bid, "date": s["settled_at"], "amount": amount,
+                     "type": "credit", "ref": ref, "narration": narr})
         truth["settlement_bank"][s["settlement_id"]] = bid
 
-    # duplicate bank entries (double credit for the same payout)
-    credits = [b for b in bank if b["type"] == "credit"]
+    credits = [b for b in bank if b["type"] == "credit" and b["ref"]]
     for b in rng.sample(credits, min(PLANT["duplicate_bank_entry"], len(credits))):
         dup = dict(b)
         dup["bank_id"] = f"BNK-{bank_seq:05d}"
         bank_seq += 1
         bank.append(dup)
-        truth["anomalies"].append({"type": "duplicate_bank_entry", "ref": dup["bank_id"]})
+        anomaly("duplicate_bank_entry", dup["bank_id"])
 
-    # unexplained credits (money in with no settlement behind it)
     for _ in range(PLANT["unexplained_credit"]):
         bid = f"BNK-{bank_seq:05d}"
         bank_seq += 1
         d = START + timedelta(days=rng.randint(2, DAYS))
-        bank.append({
-            "bank_id": bid, "date": d.isoformat(), "amount": money(rng.randint(2000, 60000) + rng.random()),
-            "type": "credit", "ref": f"IMPS{rng.randint(10**9, 10**10):d}", "narration": "IMPS INWARD",
-        })
-        truth["anomalies"].append({"type": "unexplained_credit", "ref": bid})
+        bank.append({"bank_id": bid, "date": d.isoformat(), "amount": money(rng.randint(2000, 60000) + rng.random()),
+                     "type": "credit", "ref": f"IMPS{rng.randint(10**9, 10**10):d}", "narration": "IMPS INWARD"})
+        anomaly("unexplained_credit", bid)
 
-    # refunds and chargebacks: money out, tied to a real paid order
-    debit_orders = rng.sample(paid_orders, PLANT["refund"] + PLANT["chargeback"])
-    for k, o in enumerate(debit_orders):
-        kind = "refund" if k < PLANT["refund"] else "chargeback"
+    for o in rng.sample(paid_orders, PLANT["chargeback"]):
         bid = f"BNK-{bank_seq:05d}"
         bank_seq += 1
-        d = date.fromisoformat(o["created_at"]) + timedelta(days=rng.randint(2, 6))
-        bank.append({
-            "bank_id": bid, "date": d.isoformat(), "amount": o["amount"], "type": "debit",
-            "ref": o["order_id"], "narration": f"{kind.upper()} {o['order_id']}",
-        })
-        truth["anomalies"].append({"type": kind, "ref": bid})
+        d = date.fromisoformat(o["created_at"]) + timedelta(days=rng.randint(3, 8))
+        bank.append({"bank_id": bid, "date": d.isoformat(), "amount": o["amount"], "type": "debit",
+                     "ref": o["order_id"], "narration": f"CHARGEBACK {o['order_id']}"})
+        anomaly("chargeback", bid)
 
     rng.shuffle(bank)
     _write("orders.csv", orders, ["order_id", "customer", "amount", "created_at", "status"])
-    _write("payments.csv", payments, ["payment_id", "order_id", "gross", "fee", "net", "settlement_id", "captured_at"])
-    _write("settlements.csv", settlements, ["settlement_id", "settled_at", "payment_count", "net_total", "utr"])
+    _write("payments.csv", payments, ["payment_id", "order_id", "gross", "fee", "tax", "net", "settlement_id", "captured_at"])
+    _write("refunds.csv", refunds, ["refund_id", "payment_id", "amount", "created_at", "settlement_id"])
+    _write("settlements.csv", settlements, ["settlement_id", "settled_at", "gross_total", "fee_total", "tax_total",
+                                            "refund_total", "net_total", "payment_count", "utr"])
     _write("bank.csv", bank, ["bank_id", "date", "amount", "type", "ref", "narration"])
     json.dump(truth, open(os.path.join(OUT, "truth.json"), "w"), indent=2)
 
-    print(f"orders {len(orders)}  payments {len(payments)}  settlements {len(settlements)}  bank {len(bank)}")
+    print(f"orders {len(orders)}  payments {len(payments)}  refunds {len(refunds)}  "
+          f"settlements {len(settlements)}  bank {len(bank)}")
     print(f"planted anomalies: {len(truth['anomalies'])}  ->", OUT)
 
 

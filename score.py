@@ -4,8 +4,9 @@ import json
 import os
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-PLANTED_TYPES = {"unpaid_order", "pending_settlement", "fee_mismatch", "missing_payout",
-                 "unexplained_credit", "duplicate_bank_entry", "refund", "chargeback"}
+PLANTED_TYPES = {"unpaid_order", "pending_settlement", "fee_mismatch", "tax_mismatch",
+                 "refund_not_deducted", "missing_payout", "partial_settlement",
+                 "unexplained_credit", "duplicate_bank_entry", "chargeback"}
 
 
 def score(exceptions):
