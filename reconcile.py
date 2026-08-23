@@ -1,11 +1,9 @@
 """Reconciliation engine.
 
-Walks the money trail order -> payment -> refund -> settlement -> bank across five
-sources and matches each hop with deterministic rules. A settlement is verified
-against its own components (gross - fee - tax - refunds), payouts are matched by
-UTR and fall back to amount + date when the reference is missing, and anything
-that doesn't tie out is raised as a typed exception with a reason and a suggested
-action. Every decision is written to an audit trail.
+Matches order -> payment -> refund -> settlement -> bank in passes. Exact keys
+first (order id, UTR), then a fallback on amount + date when the UTR is missing.
+Each settlement is checked against its own components. Whatever doesn't tie out
+becomes a typed exception with a reason, and every step is logged.
 """
 import csv
 import os

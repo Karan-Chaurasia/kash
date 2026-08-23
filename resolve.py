@@ -1,9 +1,8 @@
-"""Decide which exceptions are safe to clear automatically and which go to a human.
+"""Split exceptions into ones we can clear automatically and ones a human handles.
 
-Nothing is auto-resolved without evidence that fully explains it. A partial payout
-is only cleared when its shortfall matches a documented reserve; a variance we
-can't account for is escalated rather than guessed at. That "won't pretend"
-behaviour is the point of a controller versus a matcher.
+Nothing is cleared without evidence that fully explains it. A partial payout is
+only cleared when the shortfall matches a documented reserve; anything we can't
+account for is escalated instead of guessed.
 """
 import csv
 import os

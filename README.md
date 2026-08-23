@@ -1,49 +1,56 @@
 # Kosh
 
-Automated reconciliation for a payments merchant. It follows the money from an
-order to its gateway payment, into a settlement batch, and finally to the bank
-credit, and flags anything that doesn't line up.
+A reconciliation tool for a payments merchant. It follows the money from an order
+to its gateway payment, through any refund, into a settlement batch, and out to
+the bank credit, and flags whatever doesn't line up.
 
-Most finance teams still do this by hand in spreadsheets. Kosh does it in one
-command, explains every exception, and keeps an audit trail behind it.
+Finance teams mostly do this by hand in spreadsheets. Kosh runs it in one command,
+decides which exceptions it can clear on its own, escalates the rest, and keeps an
+audit trail.
 
-## What it catches
+## What it checks
 
 - Orders that were never paid
 - Payments captured but not yet settled
-- Gateway fees that don't match the expected rate
-- Settlement batches whose payout never reached the bank
+- Gateway fee or GST that doesn't match the expected working
+- Refunds that weren't netted off the payout
+- Settlement batches whose payout never reached the bank, or arrived short
 - Bank credits with no settlement behind them
-- Duplicate payouts
-- Refunds and chargebacks
+- Duplicate payouts and chargebacks
 
 ## How it works
 
-Four sources are matched in passes: orders, gateway payments, settlements, and
-the bank statement. Exact keys go first (order id, UTR reference); when a
-payout's reference is missing, it falls back to matching by amount and date.
-Whatever can't be tied out becomes a typed exception with a reason and a
-suggested next step.
+Six sources are matched in passes: orders, payments, refunds, settlements,
+reserves and the bank statement. A payout on a settlement is
+gross - fee - GST - refunds, so it is checked against its own components before
+being tied to a bank credit. Matching uses exact keys first (order id, UTR); when
+the UTR is missing from the bank feed it falls back to amount and date.
 
-The books here are synthetic and seeded, and they ship with a ground-truth file,
-so the matcher is scored on real precision and recall rather than a demo that
-only looks right.
+Anything that doesn't tie out becomes a typed exception with a reason. Kosh then
+tries to clear each one, but only with evidence: a payout short by exactly a
+documented reserve is cleared, while a shortfall it can't account for is escalated
+to a human rather than guessed.
+
+The books are synthetic and seeded, and ship with a ground-truth file, so the
+matcher is scored on real precision and recall.
 
 ## Run it
 
     python generate.py    # build the books (writes data/)
-    python run.py         # reconcile, score, write report.json
+    python run.py         # reconcile, resolve, score, write report.json
 
 Sample output:
 
-    reconciled 83.33% of value  (Rs 13,38,909 of 16,06,755)
-    exceptions raised: 52
-    accuracy vs truth -> precision 1.0  recall 1.0  f1 1.0
+    processed 872 records in 0.01s
+    reconciled 81.47% of value  (Rs 21,56,667 of 26,47,203)
+    exceptions 84  ->  auto-resolved 22  escalated 62
+    detection accuracy -> precision 1.0  recall 1.0  f1 1.0
 
 ## Files
 
     generate.py   synthetic books + ground truth
     reconcile.py  the matching engine
+    resolve.py    clears safe exceptions, escalates the rest
     score.py      precision / recall against the truth
     run.py        end to end
 

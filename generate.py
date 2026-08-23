@@ -1,10 +1,9 @@
-"""Build a synthetic but realistic set of books for a payments merchant:
-orders, gateway payments, refunds, settlement batches, and a bank statement.
+"""Make synthetic books for a payments merchant: orders, payments, refunds,
+settlements and a bank statement.
 
-A settlement is not just "payments = bank credit". It nets fee, GST on fee and
-refunds, so the payout is gross - fee - tax - refunds (+/- the odd adjustment).
-A hidden ground-truth file records the true links and the anomalies we plant, so
-the reconciler can be scored on real precision and recall instead of guesswork.
+The payout on a settlement is gross - fee - GST - refunds, so the bank credit
+won't equal the raw payment total. A truth file records the real links and the
+problems we plant so the reconciler can be scored on precision/recall.
 """
 import csv
 import json
