@@ -115,13 +115,26 @@ function render() {
       </table>
     </div>`;
 
+  const c = data.confusion;
+  const matrix = `
+    <div class="panel">
+      <h2>Detection vs ground truth (${c.population} checkable records)</h2>
+      <table style="max-width:440px">
+        <thead><tr><th></th><th>actual: problem</th><th>actual: clean</th></tr></thead>
+        <tbody>
+          <tr><th>flagged</th><td>${c.tp}</td><td>${c.fp}</td></tr>
+          <tr><th>not flagged</th><td>${c.fn}</td><td>${c.tn}</td></tr>
+        </tbody>
+      </table>
+    </div>`;
+
   const audit = `
     <div class="panel">
       <h2>Audit trail</h2>
       <div class="audit">${data.audit.map(x => `<div><b>${x.step}</b> &mdash; ${x.detail}</div>`).join("")}</div>
     </div>`;
 
-  document.getElementById("app").innerHTML = tiles + table + audit;
+  document.getElementById("app").innerHTML = tiles + table + matrix + audit;
   document.querySelectorAll(".filters button").forEach(b =>
     b.onclick = () => { filter = b.dataset.f; render(); });
 }

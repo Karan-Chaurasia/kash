@@ -29,6 +29,13 @@ def build():
         "resolved_without_evidence": sum(1 for e in resolved if not e["evidence"]),
         "escalated_value": round(sum(e["amount"] for e in escalated), 2),
     }
+
+    acc, st = result["accuracy"], result["stats"]
+    population = st["orders"] + st["payments"] + st["settlements"] + st["bank_entries"]
+    tp, fp, fn = acc["true_positive"], acc["false_positive"], acc["false_negative"]
+    tn = population - (tp + fn) - fp
+    result["confusion"] = {"tp": tp, "fp": fp, "fn": fn, "tn": tn, "population": population,
+                           "specificity": round(tn / (tn + fp), 4) if (tn + fp) else 1.0}
     return result
 
 
@@ -41,6 +48,9 @@ def main():
     print(f"exceptions {s['exceptions']}  ->  auto-resolved {r['auto_resolved']}  escalated {r['escalated']}  "
           f"({r['auto_resolution_rate']}% auto, {r['resolved_without_evidence']} resolved without evidence)")
     print(f"detection accuracy vs truth -> precision {a['precision']}  recall {a['recall']}  f1 {a['f1']}")
+    c = result["confusion"]
+    print(f"confusion (over {c['population']} checkable records) -> "
+          f"TP {c['tp']}  FP {c['fp']}  FN {c['fn']}  TN {c['tn']}")
 
 
 if __name__ == "__main__":
