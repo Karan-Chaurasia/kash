@@ -1,4 +1,4 @@
-"""Serve the Kosh dashboard. The report is recomputed on every load."""
+"""Serve the Kash dashboard. The report is recomputed on every load."""
 import http.server
 import json
 import os
@@ -34,7 +34,7 @@ def main():
     if not os.path.exists(os.path.join(HERE, "data", "orders.csv")):
         generate.main()
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        print(f"Kosh dashboard: http://localhost:{PORT}/")
+        print(f"Kash dashboard: http://localhost:{PORT}/")
         httpd.serve_forever()
 
 

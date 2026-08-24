@@ -1,10 +1,10 @@
-# Kosh
+# Kash
 
 A reconciliation tool for a payments merchant. It follows the money from an order
 to its gateway payment, through any refund, into a settlement batch, and out to
 the bank credit, and flags whatever doesn't line up.
 
-Finance teams mostly do this by hand in spreadsheets. Kosh runs it in one command,
+Finance teams mostly do this by hand in spreadsheets. Kash runs it in one command,
 decides which exceptions it can clear on its own, escalates the rest, and keeps an
 audit trail.
 
@@ -26,7 +26,7 @@ gross - fee - GST - refunds, so it is checked against its own components before
 being tied to a bank credit. Matching uses exact keys first (order id, UTR); when
 the UTR is missing from the bank feed it falls back to amount and date.
 
-Anything that doesn't tie out becomes a typed exception with a reason. Kosh then
+Anything that doesn't tie out becomes a typed exception with a reason. Kash then
 tries to clear each one, but only with evidence: a payout short by exactly a
 documented reserve is cleared, while a shortfall it can't account for is escalated
 to a human rather than guessed.
