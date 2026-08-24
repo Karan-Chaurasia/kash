@@ -4,7 +4,10 @@ Deterministic and offline. If a question names a record (ORD-, PAY-, STL-, BNK-)
 it explains that item; otherwise it matches a few intents (what needs review,
 unresolved value, a specific exception type, or an overall summary).
 """
+import json
 import re
+
+from llm import ask_llm, available
 
 TYPE_WORDS = {
     "fee": "fee_mismatch", "tax": "tax_mismatch", "gst": "tax_mismatch",
@@ -31,6 +34,10 @@ def answer(q, report):
             out.append(f"{ref} ({e['type']}, Rs {e['amount']:.0f}) was {verb}. "
                        f"{e.get('resolution') or e['reason']} "
                        f"Evidence: {', '.join(e['evidence']) or '-'}.")
+        if available() and any(w in ql for w in ("why", "investigate", "explain", "cause")):
+            llm = _investigate(hits)
+            if llm:
+                return llm
         return " ".join(out)
 
     if any(w in ql for w in ("how much", "value", "unresolved", "at risk")):
@@ -63,5 +70,25 @@ def answer(q, report):
                 f"{s['exceptions']} exceptions: {r['auto_resolved']} auto-resolved, {r['escalated']} escalated. "
                 f"Detection precision {a['precision']}, recall {a['recall']}.")
 
+    if available():
+        llm = _freeform(q, report)
+        if llm:
+            return llm
     return ("Try a record id (e.g. STL-00007), 'what needs review', 'unresolved value', "
             "'fee mismatches', or 'summary'.")
+
+
+def _investigate(hits):
+    prompt = ("You are a finance controller. Explain the most likely cause of this reconciliation "
+              "exception in at most two sentences and recommend one action. Use only the facts given, "
+              "do not invent numbers, and if they don't determine the cause say it needs manual review.\n"
+              "Facts: " + json.dumps(hits))
+    return ask_llm(prompt)
+
+
+def _freeform(q, report):
+    ctx = {"stats": report["stats"], "resolution": report["resolution"], "accuracy": report["accuracy"]}
+    prompt = ("You are a finance controller answering a question about today's close. Use only these "
+              "facts, do not invent numbers, keep it under three sentences.\n"
+              f"Question: {q}\nFacts: " + json.dumps(ctx))
+    return ask_llm(prompt)
