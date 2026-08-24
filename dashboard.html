@@ -47,6 +47,11 @@
   .audit { padding:8px 16px; }
   .audit div { padding:5px 0; color:var(--dim); border-bottom:1px dashed var(--line); }
   .audit b { color:var(--ink); }
+  #askbar { background:var(--card); border-bottom:1px solid var(--line); padding:10px 22px;
+            display:flex; gap:10px; align-items:center; }
+  #askbar input { flex:1; max-width:540px; padding:8px 12px; border:1px solid var(--line);
+                  border-radius:7px; font:inherit; }
+  #ans { color:var(--dim); font-size:13px; }
 </style>
 </head>
 <body>
@@ -56,6 +61,11 @@
   <span class="spacer"></span>
   <button id="run">Run close</button>
 </header>
+<div id="askbar">
+  <input id="q" placeholder="Ask about the close, e.g. what needs review, STL-00007, unresolved value">
+  <button id="ask">Ask</button>
+  <span id="ans"></span>
+</div>
 <main id="app"><p style="color:var(--dim)">Loading…</p></main>
 
 <script>
@@ -139,6 +149,16 @@ function render() {
     b.onclick = () => { filter = b.dataset.f; render(); });
 }
 
+async function ask() {
+  const q = document.getElementById("q").value.trim();
+  if (!q) return;
+  const ans = document.getElementById("ans");
+  ans.textContent = "…";
+  const r = await (await fetch("/ask?q=" + encodeURIComponent(q))).json();
+  ans.textContent = r.answer;
+}
+document.getElementById("ask").onclick = ask;
+document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
 document.getElementById("run").onclick = runClose;
 runClose();
 </script>

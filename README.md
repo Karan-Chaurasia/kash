@@ -36,6 +36,10 @@ matcher is scored on real precision and recall.
 
 ## Run it
 
+    python serve.py       # dashboard at http://localhost:8000 (builds the books if needed)
+
+or on the command line:
+
     python generate.py    # build the books (writes data/)
     python run.py         # reconcile, resolve, score, write report.json
 
@@ -52,6 +56,9 @@ Sample output:
     reconcile.py  the matching engine
     resolve.py    clears safe exceptions, escalates the rest
     score.py      precision / recall against the truth
-    run.py        end to end
+    run.py         end to end (writes report.json)
+    ask.py         answers plain questions about the close
+    serve.py       serves the dashboard
+    dashboard.html the finance close view
 
 Pure Python, no dependencies.
