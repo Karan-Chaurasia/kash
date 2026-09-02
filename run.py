@@ -41,7 +41,8 @@ def build():
 
 def main():
     result = build()
-    json.dump(result, open(os.path.join(HERE, "report.json"), "w"), indent=2)
+    with open(os.path.join(HERE, "report.json"), "w") as f:
+        json.dump(result, f, indent=2)
     s, a, r = result["stats"], result["accuracy"], result["resolution"]
     print(f"processed {s['records']} records in {s['seconds']}s")
     print(f"reconciled {s['reconciled_pct']}% of value  (Rs {s['reconciled_value']:.0f} of {s['settled_value']:.0f})")

@@ -117,18 +117,24 @@ def reconcile(orders, payments, refunds, settlements, bank):
             by_ref.setdefault(b["ref"], []).append(b)
 
     used, settle_utrs, reconciled_value = set(), {s["utr"] for s in settlements.values()}, 0.0
+    # track which bank_id was matched to which settlement (for duplicate detection on fuzzy matches)
+    matched_ref_to_sid = {}  # bank ref -> sid that claimed it
     for sid, s in settlements.items():
         group = sorted(by_ref.get(s["utr"], []), key=lambda b: _num(b["bank_id"]))
-        primary = group[0] if group else _match_by_amount_date(s, credits, used)
+        primary = group[0] if group else _match_fuzzy_utr(s, credits, used) or _match_by_amount_date(s, credits, used)
         if primary and abs(primary["amount"] - s["net_total"]) <= TOL:
             used.add(primary["bank_id"])
             links.append(("settlement->bank", sid, primary["bank_id"]))
             reconciled_value += s["net_total"]
+            if primary["ref"]:
+                matched_ref_to_sid[primary["ref"]] = sid
         elif primary and primary["amount"] < s["net_total"] - TOL:
             flag("partial_settlement", sid, round(s["net_total"] - primary["amount"], 2),
                  f"Payout {primary['amount']} is short of settlement {s['net_total']}.")
             used.add(primary["bank_id"])
             reconciled_value += primary["amount"]
+            if primary["ref"]:
+                matched_ref_to_sid[primary["ref"]] = sid
         elif primary:
             flag("payout_amount_mismatch", sid, primary["amount"],
                  f"Payout {primary['amount']} exceeds settlement {s['net_total']}.")
@@ -138,9 +144,18 @@ def reconcile(orders, payments, refunds, settlements, bank):
         for extra in group[1:]:
             flag("duplicate_bank_entry", extra["bank_id"], extra["amount"], f"Duplicate credit for {s['utr']}.")
             used.add(extra["bank_id"])
+        # catch duplicates of fuzzy-matched primary immediately
+        if primary and primary["ref"] and primary["ref"] not in settle_utrs:
+            for dup in credits:
+                if dup["bank_id"] not in used and dup["ref"] == primary["ref"]:
+                    flag("duplicate_bank_entry", dup["bank_id"], dup["amount"],
+                         f"Duplicate credit for {primary['ref']} (already matched to {sid}).")
+                    used.add(dup["bank_id"])
 
     for b in credits:
-        if b["ref"] not in settle_utrs and b["bank_id"] not in used:
+        if b["bank_id"] in used:
+            continue
+        if b["ref"] not in settle_utrs:
             flag("unexplained_credit", b["bank_id"], b["amount"], f"Credit {b['bank_id']} has no matching settlement.")
 
     for b in debits:
@@ -160,7 +175,49 @@ def reconcile(orders, payments, refunds, settlements, bank):
     return {"exceptions": exceptions, "audit": audit, "links": links, "stats": stats}
 
 
-def _match_by_amount_date(s, credits, used, window=1):
+def _fuzzy_utr(a, b):
+    """True when b looks like a corrupted version of a: truncated by 1 char,
+    or has exactly one non-digit character substitution (e.g. 0->O, 1->I).
+    Digit-only substitutions are excluded to avoid false matches on sequential UTRs.
+    """
+    if a == b:
+        return True
+    # truncation: b is a with last char removed
+    if len(a) == len(b) + 1 and a[:-1] == b:
+        return True
+    if len(b) == len(a) + 1 and b[:-1] == a:
+        return True
+    # single non-digit substitution (e.g. 0->O, 1->l)
+    if len(a) == len(b):
+        diffs = [(x, y) for x, y in zip(a, b) if x != y]
+        if len(diffs) == 1:
+            x, y = diffs[0]
+            # only accept if at least one side is non-digit (genuine corruption, not sequential)
+            if not (x.isdigit() and y.isdigit()):
+                return True
+    return False
+
+
+def _match_fuzzy_utr(s, credits, used):
+    """Match by fuzzy UTR similarity when exact UTR lookup fails.
+    When multiple fuzzy hits exist, narrow by amount to avoid cross-settlement collisions.
+    Among ties, prefer the lowest bank_id (original over duplicate).
+    """
+    utr = s.get("utr", "")
+    if not utr:
+        return None
+    hits = [b for b in credits if b["bank_id"] not in used and b["ref"] and _fuzzy_utr(utr, b["ref"])]
+    if len(hits) == 1:
+        return hits[0]
+    # tiebreak by amount proximity, then lowest bank_id
+    amount_hits = sorted(
+        [b for b in hits if abs(b["amount"] - s["net_total"]) <= TOL],
+        key=lambda b: _num(b["bank_id"])
+    )
+    return amount_hits[0] if amount_hits else None
+
+
+def _match_by_amount_date(s, credits, used, window=3):
     target, sd = s["net_total"], date.fromisoformat(s["settled_at"])
     hits = [b for b in credits if b["bank_id"] not in used and abs(b["amount"] - target) <= TOL
             and abs((date.fromisoformat(b["date"]) - sd).days) <= window]

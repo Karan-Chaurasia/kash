@@ -30,7 +30,10 @@ PLANT = {
     "unexplained_credit": 6,
     "duplicate_bank_entry": 4,
     "chargeback": 6,
-    "garbled_ref": 8,           # not an error - the UTR is missing, tests the matcher
+    "garbled_ref": 2,           # UTR missing (base fallback test)
+    "fuzzy_utr": 5,             # UTR corrupted + date shifted
+    "near_miss_amount": 5,      # amount within TOL but not exact
+    "noisy_description": 2,     # narration noise
 }
 
 CUSTOMERS = [
@@ -147,6 +150,10 @@ def main():
     reserve_backed = set(partial_list[:3])  # these shortfalls have a documented reserve behind them
     g0 = m + PLANT["partial_settlement"]
     garbled = set(pool[g0:g0 + PLANT["garbled_ref"]])
+    fuzzy = set(pool[g0 + PLANT["garbled_ref"]:g0 + PLANT["garbled_ref"] + PLANT["fuzzy_utr"]])
+    near_miss = set(pool[g0 + PLANT["garbled_ref"] + PLANT["fuzzy_utr"]:g0 + PLANT["garbled_ref"] + PLANT["fuzzy_utr"] + PLANT["near_miss_amount"]])
+    noisy = set(pool[g0 + PLANT["garbled_ref"] + PLANT["fuzzy_utr"] + PLANT["near_miss_amount"]:g0 + PLANT["garbled_ref"] + PLANT["fuzzy_utr"] + PLANT["near_miss_amount"] + PLANT["noisy_description"]])
+
 
     bank_seq = 1
     for i, s in enumerate(settlements):
@@ -155,7 +162,11 @@ def main():
             continue
         bid = f"BNK-{bank_seq:05d}"
         bank_seq += 1
-        amount, ref, narr = s["net_total"], s["utr"], f"NEFT PAYOUT {s['utr']} RAZORPAY"
+        # defaults
+        amount = s["net_total"]
+        ref = s["utr"]
+        narr = f"NEFT PAYOUT {s['utr']} RAZORPAY"
+        bank_date = s["settled_at"]
         if i in partial:
             shortfall = rng.choice([500, 1200, 2500, 4000])
             amount = money(s["net_total"] - shortfall)
@@ -165,8 +176,26 @@ def main():
                                  "amount": money(shortfall), "date": s["settled_at"],
                                  "reason": rng.choice(["Rolling reserve hold", "Dispute reserve", "Risk hold"])})
         elif i in garbled:
-            ref, narr = "", "NEFT INWARD SETTLEMENT"  # UTR dropped by the bank feed
-        bank.append({"bank_id": bid, "date": s["settled_at"], "amount": amount,
+            ref, narr = "", "NEFT INWARD SETTLEMENT"
+        elif i in fuzzy:
+            corruptions = [
+                s["utr"][:-1],
+                s["utr"][:-2] + s["utr"][-1],
+                s["utr"][:4] + ("0" if s["utr"][4] != "0" else "O") + s["utr"][5:],
+            ]
+            ref = rng.choice(corruptions)
+            narr = f"NEFT PAYOUT {ref} RAZORPAY"
+            bank_date = (date.fromisoformat(s["settled_at"]) + timedelta(days=2)).isoformat()
+        elif i in near_miss:
+            delta = rng.choice([0.01, 0.02, 0.03, 0.04, -0.01, -0.02])
+            amount = money(s["net_total"] + delta)
+        elif i in noisy:
+            narr = rng.choice([
+                f"NEFT PAYOUT {s['utr']} RAZORPAY XXXX",
+                f"NEFT PAYOUT {s['utr']} RAZORPAY - SETTLEMENT",
+                f"NEFT PAYOUT {s['utr']} RAZORPAY / INWARD",
+            ])
+        bank.append({"bank_id": bid, "date": bank_date, "amount": amount,
                      "type": "credit", "ref": ref, "narration": narr})
         truth["settlement_bank"][s["settlement_id"]] = bid
 

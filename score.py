@@ -10,7 +10,8 @@ PLANTED_TYPES = {"unpaid_order", "pending_settlement", "fee_mismatch", "tax_mism
 
 
 def score(exceptions):
-    truth = json.load(open(os.path.join(DATA, "truth.json")))
+    with open(os.path.join(DATA, "truth.json")) as f:
+        truth = json.load(f)
     planted = {(a["type"], a["ref"]) for a in truth["anomalies"]}
     found = {(e["type"], e["ref"]) for e in exceptions if e["type"] in PLANTED_TYPES}
 
