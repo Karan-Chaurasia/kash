@@ -29,6 +29,8 @@
            margin-bottom:14px; display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
   .strip b { color:var(--teal); }
   .badge { font-size:12px; padding:3px 9px; border-radius:20px; background:#eaf5ee; color:var(--green); }
+  .score { font-size:13px; padding:5px 14px; border-radius:20px; background:#0f766e;
+           color:#fff; font-weight:700; letter-spacing:.3px; }
   .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:14px; }
   .panel h2 { font-size:13px; margin:0; padding:12px 16px; border-bottom:1px solid var(--line); color:var(--dim);
               text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:10px; }
@@ -94,8 +96,8 @@ function render() {
     <div class="strip">
       <span>auto-resolved <b>${r.auto_resolved}</b> of ${s.exceptions} (${r.auto_resolution_rate}%)</span>
       <span>escalated value <b>${inr(r.escalated_value)}</b></span>
-      <span class="badge">${r.resolved_without_evidence} resolved without evidence</span>
-      <span>detection precision <b>${a.precision}</b> · recall <b>${a.recall}</b> · f1 <b>${a.f1}</b></span>
+      <span class="badge">${r.resolved_without_evidence === 0 ? '✓ all resolutions have evidence' : r.resolved_without_evidence + ' resolved without evidence'}</span>
+      <span class="score">precision ${a.precision} · recall ${a.recall} · f1 ${a.f1}</span>
     </div>`;
 
   const rows = data.exceptions
@@ -132,8 +134,8 @@ function render() {
       <table style="max-width:440px">
         <thead><tr><th></th><th>actual: problem</th><th>actual: clean</th></tr></thead>
         <tbody>
-          <tr><th>flagged</th><td>${c.tp}</td><td>${c.fp}</td></tr>
-          <tr><th>not flagged</th><td>${c.fn}</td><td>${c.tn}</td></tr>
+          <tr><th>flagged</th><td style="color:var(--green);font-weight:700">${c.tp}</td><td style="color:${c.fp>0?'var(--red)':'var(--dim)'}">${c.fp}</td></tr>
+          <tr><th>not flagged</th><td style="color:${c.fn>0?'var(--red)':'var(--dim)'}">${c.fn}</td><td style="color:var(--green);font-weight:700">${c.tn}</td></tr>
         </tbody>
       </table>
     </div>`;
