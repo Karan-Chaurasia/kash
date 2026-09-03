@@ -5,122 +5,291 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kash</title>
 <style>
-  :root { --bg:#f5f6f8; --card:#fff; --line:#e3e6eb; --ink:#1f2733; --dim:#6b7480;
-          --teal:#0f766e; --green:#15803d; --amber:#b45309; --red:#b91c1c; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-         font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
-  header { background:var(--card); border-bottom:1px solid var(--line); padding:14px 22px;
-           display:flex; align-items:center; gap:14px; }
-  header h1 { font-size:18px; margin:0; letter-spacing:.5px; }
-  header .sub { color:var(--dim); font-size:12.5px; }
-  header .spacer { flex:1; }
-  button { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--ink);
-           padding:7px 14px; border-radius:7px; cursor:pointer; }
-  button:hover { border-color:var(--teal); color:var(--teal); }
-  main { max-width:1100px; margin:0 auto; padding:22px; }
+  /* ── tokens ── */
+  :root {
+    --bg:#f0f2f5; --card:#fff; --line:#e3e6eb; --ink:#1a2332; --dim:#6b7480;
+    --teal:#0f766e; --teal-light:#e6f4f3; --green:#15803d; --green-light:#eaf5ee;
+    --amber:#b45309; --amber-light:#fdf0e6; --red:#b91c1c;
+    --mono: ui-monospace,Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--ink);
+         font:14px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+
+  /* ── splash ── */
+  #splash {
+    position:fixed; inset:0; background:#0a1a0a;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; z-index:999;
+    animation: none;
+  }
+  #splash.hide { animation: fadeOut .5s forwards; }
+  @keyframes fadeOut { to { opacity:0; pointer-events:none; } }
+
+  .splash-logo {
+    font-family: var(--mono);
+    font-size: clamp(48px, 10vw, 96px);
+    font-weight: 700;
+    color: #00ff88;
+    letter-spacing: 8px;
+    text-shadow: 0 0 40px #00ff8866, 0 0 80px #00ff8833;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { text-shadow: 0 0 40px #00ff8866, 0 0 80px #00ff8833; }
+    50%      { text-shadow: 0 0 60px #00ff88aa, 0 0 120px #00ff8855; }
+  }
+  .splash-sub {
+    font-family: var(--mono);
+    color: #00cc66;
+    font-size: 13px;
+    letter-spacing: 3px;
+    margin-top: 18px;
+    opacity: .7;
+  }
+  .splash-hint {
+    font-family: var(--mono);
+    color: #336644;
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-top: 48px;
+    animation: blink 1.2s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── app shell (hidden until splash dismissed) ── */
+  #shell { display:none; min-height:100vh; }
+
+  /* ── header ── */
+  header {
+    background:var(--card); border-bottom:1px solid var(--line);
+    padding:0 24px; height:52px;
+    display:flex; align-items:center; gap:16px;
+    position:sticky; top:0; z-index:10;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .logo { font-family:var(--mono); font-size:17px; font-weight:700;
+          color:var(--teal); letter-spacing:2px; }
+  .logo span { color:var(--ink); }
+  .sub { color:var(--dim); font-size:12px; }
+  .spacer { flex:1; }
+  .hbtn {
+    font:inherit; border:1px solid var(--line); background:var(--card);
+    color:var(--ink); padding:6px 14px; border-radius:6px; cursor:pointer;
+    font-size:13px; transition: all .15s;
+  }
+  .hbtn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-light); }
+  .hbtn.primary { background:var(--teal); color:#fff; border-color:var(--teal); }
+  .hbtn.primary:hover { background:#0d6560; }
+
+  /* ── ask bar ── */
+  #askbar {
+    background:var(--card); border-bottom:1px solid var(--line);
+    padding:10px 24px; display:flex; gap:10px; align-items:center;
+  }
+  #askbar input {
+    flex:1; max-width:520px; padding:8px 12px;
+    border:1px solid var(--line); border-radius:6px; font:inherit; font-size:13px;
+    transition: border-color .15s;
+  }
+  #askbar input:focus { outline:none; border-color:var(--teal); }
+  #ans { color:var(--dim); font-size:13px; flex:1; }
+
+  /* ── main ── */
+  main { max-width:1140px; margin:0 auto; padding:24px; }
+
+  /* ── tiles ── */
   .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px; }
-  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; }
-  .tile .n { font-size:24px; font-weight:700; }
-  .tile .l { color:var(--dim); font-size:12px; margin-top:2px; }
+  .tile {
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px; position:relative; overflow:hidden;
+  }
+  .tile::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:var(--line);
+  }
+  .tile.good::before { background:var(--green); }
+  .tile.warn::before { background:var(--amber); }
+  .tile.info::before { background:var(--teal); }
+  .tile .n { font-size:26px; font-weight:700; line-height:1.2; }
+  .tile .l { color:var(--dim); font-size:12px; margin-top:4px; }
   .tile.good .n { color:var(--green); }
   .tile.warn .n { color:var(--amber); }
-  .strip { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 16px;
-           margin-bottom:14px; display:flex; gap:26px; align-items:center; flex-wrap:wrap; }
-  .strip b { color:var(--teal); }
-  .badge { font-size:12px; padding:3px 9px; border-radius:20px; background:#eaf5ee; color:var(--green); }
-  .score { font-size:13px; padding:5px 14px; border-radius:20px; background:#0f766e;
-           color:#fff; font-weight:700; letter-spacing:.3px; }
-  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; margin-bottom:14px; }
-  .panel h2 { font-size:13px; margin:0; padding:12px 16px; border-bottom:1px solid var(--line); color:var(--dim);
-              text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:10px; }
+  .tile.info .n { color:var(--teal); }
+
+  /* ── strip ── */
+  .strip {
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:12px 18px; margin-bottom:14px;
+    display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+  }
+  .strip-item { display:flex; align-items:center; gap:6px; font-size:13px; }
+  .strip-item b { color:var(--teal); }
+  .badge { font-size:12px; padding:3px 10px; border-radius:20px;
+           background:var(--green-light); color:var(--green); font-weight:600; }
+  .score {
+    font-size:13px; padding:5px 14px; border-radius:20px;
+    background:var(--teal); color:#fff; font-weight:700; letter-spacing:.3px;
+    margin-left:auto;
+  }
+
+  /* ── panel ── */
+  .panel {
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    overflow:hidden; margin-bottom:14px;
+  }
+  .panel-head {
+    font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px;
+    color:var(--dim); padding:11px 18px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; background:#fafbfc;
+  }
   .filters { margin-left:auto; display:flex; gap:6px; }
-  .filters button { padding:3px 10px; font-size:12px; }
+  .filters button {
+    font:inherit; padding:3px 11px; font-size:12px; border-radius:5px;
+    border:1px solid var(--line); background:var(--card); color:var(--dim); cursor:pointer;
+    transition: all .15s;
+  }
+  .filters button:hover { border-color:var(--teal); color:var(--teal); }
   .filters button.on { background:var(--teal); color:#fff; border-color:var(--teal); }
+
+  /* ── table ── */
   table { width:100%; border-collapse:collapse; font-size:13px; }
-  th,td { text-align:left; padding:9px 16px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--dim); font-weight:600; font-size:12px; }
-  tr:last-child td { border-bottom:none; }
-  .pill { font-size:11.5px; padding:2px 9px; border-radius:20px; font-weight:600; white-space:nowrap; }
-  .pill.resolved { background:#eaf5ee; color:var(--green); }
-  .pill.escalate { background:#fdf0e6; color:var(--amber); }
-  .mono { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; color:var(--dim); }
-  .ev { color:var(--dim); font-size:12px; }
-  .audit { padding:8px 16px; }
-  .audit div { padding:5px 0; color:var(--dim); border-bottom:1px dashed var(--line); }
-  .audit b { color:var(--ink); }
-  #askbar { background:var(--card); border-bottom:1px solid var(--line); padding:10px 22px;
-            display:flex; gap:10px; align-items:center; }
-  #askbar input { flex:1; max-width:540px; padding:8px 12px; border:1px solid var(--line);
-                  border-radius:7px; font:inherit; }
-  #ans { color:var(--dim); font-size:13px; }
+  th,td { text-align:left; padding:10px 18px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:11.5px; background:#fafbfc; }
+  tbody tr:last-child td { border-bottom:none; }
+  tbody tr:hover { background:#fafbfc; }
+  .pill { font-size:11px; padding:2px 9px; border-radius:20px; font-weight:700; white-space:nowrap; }
+  .pill.resolved { background:var(--green-light); color:var(--green); }
+  .pill.escalate { background:var(--amber-light); color:var(--amber); }
+  .mono { font-family:var(--mono); font-size:12px; color:var(--dim); }
+  .ev { color:var(--dim); font-size:11.5px; margin-top:2px; }
+  .type-tag {
+    font-size:11px; padding:2px 8px; border-radius:4px;
+    background:var(--teal-light); color:var(--teal); font-family:var(--mono);
+    white-space:nowrap;
+  }
+
+  /* ── confusion matrix ── */
+  .matrix-wrap { padding:16px 18px; }
+  .matrix-wrap table { max-width:400px; }
+  .matrix-wrap th { background:transparent; }
+  .cell-tp { color:var(--green); font-weight:700; font-size:18px; }
+  .cell-tn { color:var(--green); font-weight:700; font-size:18px; }
+  .cell-fp { font-size:18px; }
+  .cell-fn { font-size:18px; }
+
+  /* ── audit ── */
+  .audit { padding:10px 18px; }
+  .audit-row { padding:7px 0; color:var(--dim); border-bottom:1px dashed var(--line);
+               font-size:13px; display:flex; gap:10px; align-items:baseline; }
+  .audit-row:last-child { border-bottom:none; }
+  .audit-step { font-family:var(--mono); font-size:11.5px; color:var(--teal);
+                background:var(--teal-light); padding:1px 7px; border-radius:4px;
+                white-space:nowrap; }
+
+  /* ── loading ── */
+  .loading { padding:40px; text-align:center; color:var(--dim); font-size:13px; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Kash</h1>
-  <span class="sub" id="sub">finance close</span>
-  <span class="spacer"></span>
-  <button id="run">Run close</button>
-</header>
-<div id="askbar">
-  <input id="q" placeholder="Ask about the close, e.g. what needs review, STL-00007, unresolved value">
-  <button id="ask">Ask</button>
-  <span id="ans"></span>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo">KASH</div>
+  <div class="splash-sub">payments reconciliation engine</div>
+  <div class="splash-hint">press any key or click to continue</div>
 </div>
-<main id="app"><p style="color:var(--dim)">Loading…</p></main>
+
+<!-- APP -->
+<div id="shell">
+  <header>
+    <div class="logo">K<span>ash</span></div>
+    <span class="sub" id="sub">finance close</span>
+    <span class="spacer"></span>
+    <button class="hbtn primary" id="run">Run close</button>
+  </header>
+
+  <div id="askbar">
+    <input id="q" placeholder="Ask: what needs review · STL-00007 · unresolved value · fee mismatches">
+    <button class="hbtn" id="ask">Ask</button>
+    <span id="ans"></span>
+  </div>
+
+  <main id="app"><div class="loading">Loading…</div></main>
+</div>
 
 <script>
-const inr = (x) => "₹" + Math.round(x).toLocaleString("en-IN");
-let data = null, filter = "all";
+/* ── splash ── */
+function dismissSplash() {
+  const s = document.getElementById('splash');
+  s.classList.add('hide');
+  document.getElementById('shell').style.display = 'block';
+  setTimeout(() => s.remove(), 500);
+}
+document.getElementById('splash').addEventListener('click', dismissSplash);
+document.addEventListener('keydown', dismissSplash, { once: true });
+
+/* ── app ── */
+const inr = x => '₹' + Math.round(x).toLocaleString('en-IN');
+let data = null, filter = 'all';
 
 async function runClose() {
-  const app = document.getElementById("app");
-  app.innerHTML = '<p style="color:var(--dim)">Running close…</p>';
-  data = await (await fetch("/report.json", { cache: "no-store" })).json();
+  document.getElementById('app').innerHTML = '<div class="loading">Running close…</div>';
+  data = await (await fetch('/report.json', { cache: 'no-store' })).json();
   render();
 }
 
 function render() {
   const s = data.stats, r = data.resolution, a = data.accuracy;
-  document.getElementById("sub").textContent =
-    `finance close  ${s.records} records reconciled in ${s.seconds}s`;
+  document.getElementById('sub').textContent =
+    `finance close · ${s.records} records · ${s.seconds}s`;
 
   const tiles = `
     <div class="tiles">
-      <div class="tile"><div class="n">${s.records}</div><div class="l">records processed</div></div>
-      <div class="tile good"><div class="n">${s.reconciled_pct}%</div><div class="l">value reconciled (${inr(s.reconciled_value)})</div></div>
-      <div class="tile"><div class="n">${s.exceptions}</div><div class="l">exceptions found</div></div>
-      <div class="tile warn"><div class="n">${r.escalated}</div><div class="l">escalated to a human</div></div>
+      <div class="tile info">
+        <div class="n">${s.records}</div>
+        <div class="l">records processed</div>
+      </div>
+      <div class="tile good">
+        <div class="n">${s.reconciled_pct}%</div>
+        <div class="l">value reconciled · ${inr(s.reconciled_value)}</div>
+      </div>
+      <div class="tile">
+        <div class="n">${s.exceptions}</div>
+        <div class="l">exceptions found</div>
+      </div>
+      <div class="tile warn">
+        <div class="n">${r.escalated}</div>
+        <div class="l">escalated to human · ${inr(r.escalated_value)}</div>
+      </div>
     </div>
     <div class="strip">
-      <span>auto-resolved <b>${r.auto_resolved}</b> of ${s.exceptions} (${r.auto_resolution_rate}%)</span>
-      <span>escalated value <b>${inr(r.escalated_value)}</b></span>
-      <span class="badge">${r.resolved_without_evidence === 0 ? '✓ all resolutions have evidence' : r.resolved_without_evidence + ' resolved without evidence'}</span>
-      <span class="score">precision ${a.precision} · recall ${a.recall} · f1 ${a.f1}</span>
+      <div class="strip-item">auto-resolved <b>${r.auto_resolved}</b> of ${s.exceptions} &nbsp;(${r.auto_resolution_rate}%)</div>
+      <div class="strip-item badge">${r.resolved_without_evidence === 0 ? '✓ all resolutions have evidence' : r.resolved_without_evidence + ' resolved without evidence'}</div>
+      <div class="score">precision ${a.precision} · recall ${a.recall} · f1 ${a.f1}</div>
     </div>`;
 
   const rows = data.exceptions
-    .filter(e => filter === "all" || e.status === filter)
+    .filter(e => filter === 'all' || e.status === filter)
     .map(e => `
       <tr>
-        <td>${e.type}</td>
+        <td><span class="type-tag">${e.type}</span></td>
         <td class="mono">${e.ref}</td>
         <td>${inr(e.amount)}</td>
-        <td><span class="pill ${e.status}">${e.status === "resolved" ? "resolved" : "review"}</span></td>
+        <td><span class="pill ${e.status}">${e.status === 'resolved' ? 'resolved' : 'review'}</span></td>
         <td>${Math.round(e.confidence * 100)}%</td>
-        <td>${e.resolution || e.reason}<div class="ev">evidence: ${e.evidence.join(", ") || "-"}</div></td>
-      </tr>`).join("");
+        <td>${e.resolution || e.reason}<div class="ev">evidence: ${e.evidence.join(', ') || '—'}</div></td>
+      </tr>`).join('');
 
   const table = `
     <div class="panel">
-      <h2>Exceptions
+      <div class="panel-head">Exceptions
         <span class="filters">
           <button data-f="all" class="${filter==='all'?'on':''}">all</button>
           <button data-f="escalate" class="${filter==='escalate'?'on':''}">to review</button>
           <button data-f="resolved" class="${filter==='resolved'?'on':''}">auto-resolved</button>
         </span>
-      </h2>
+      </div>
       <table>
         <thead><tr><th>Type</th><th>Reference</th><th>Amount</th><th>Status</th><th>Conf.</th><th>Reason &amp; evidence</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -130,38 +299,54 @@ function render() {
   const c = data.confusion;
   const matrix = `
     <div class="panel">
-      <h2>Detection vs ground truth (${c.population} checkable records)</h2>
-      <table style="max-width:440px">
-        <thead><tr><th></th><th>actual: problem</th><th>actual: clean</th></tr></thead>
-        <tbody>
-          <tr><th>flagged</th><td style="color:var(--green);font-weight:700">${c.tp}</td><td style="color:${c.fp>0?'var(--red)':'var(--dim)'}">${c.fp}</td></tr>
-          <tr><th>not flagged</th><td style="color:${c.fn>0?'var(--red)':'var(--dim)'}">${c.fn}</td><td style="color:var(--green);font-weight:700">${c.tn}</td></tr>
-        </tbody>
-      </table>
+      <div class="panel-head">Detection vs ground truth · ${c.population} checkable records</div>
+      <div class="matrix-wrap">
+        <table>
+          <thead><tr><th></th><th>actual: problem</th><th>actual: clean</th></tr></thead>
+          <tbody>
+            <tr>
+              <th>flagged</th>
+              <td class="cell-tp">${c.tp}</td>
+              <td class="cell-fp" style="color:${c.fp>0?'var(--red)':'var(--dim)'}">${c.fp}</td>
+            </tr>
+            <tr>
+              <th>not flagged</th>
+              <td class="cell-fn" style="color:${c.fn>0?'var(--red)':'var(--dim)'}">${c.fn}</td>
+              <td class="cell-tn">${c.tn}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>`;
 
   const audit = `
     <div class="panel">
-      <h2>Audit trail</h2>
-      <div class="audit">${data.audit.map(x => `<div><b>${x.step}</b> &mdash; ${x.detail}</div>`).join("")}</div>
+      <div class="panel-head">Audit trail</div>
+      <div class="audit">
+        ${data.audit.map(x => `
+          <div class="audit-row">
+            <span class="audit-step">${x.step}</span>
+            <span>${x.detail}</span>
+          </div>`).join('')}
+      </div>
     </div>`;
 
-  document.getElementById("app").innerHTML = tiles + table + matrix + audit;
-  document.querySelectorAll(".filters button").forEach(b =>
+  document.getElementById('app').innerHTML = tiles + table + matrix + audit;
+  document.querySelectorAll('.filters button').forEach(b =>
     b.onclick = () => { filter = b.dataset.f; render(); });
 }
 
 async function ask() {
-  const q = document.getElementById("q").value.trim();
+  const q = document.getElementById('q').value.trim();
   if (!q) return;
-  const ans = document.getElementById("ans");
-  ans.textContent = "…";
-  const r = await (await fetch("/ask?q=" + encodeURIComponent(q))).json();
-  ans.textContent = r.answer;
+  const ans = document.getElementById('ans');
+  ans.textContent = '…';
+  const res = await (await fetch('/ask?q=' + encodeURIComponent(q))).json();
+  ans.textContent = res.answer;
 }
-document.getElementById("ask").onclick = ask;
-document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
-document.getElementById("run").onclick = runClose;
+document.getElementById('ask').onclick = ask;
+document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+document.getElementById('run').onclick = runClose;
 runClose();
 </script>
 </body>
