@@ -5,68 +5,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kash</title>
 <style>
-  /* ── tokens ── */
   :root {
     --bg:#f0f2f5; --card:#fff; --line:#e3e6eb; --ink:#1a2332; --dim:#6b7480;
     --teal:#0f766e; --teal-light:#e6f4f3; --green:#15803d; --green-light:#eaf5ee;
-    --amber:#b45309; --amber-light:#fdf0e6; --red:#b91c1c;
+    --amber:#b45309; --amber-light:#fdf0e6; --red:#b91c1c; --red-light:#fef2f2;
+    --blue:#1d4ed8; --blue-light:#eff6ff;
     --mono: ui-monospace,Menlo,Consolas,monospace;
   }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--ink);
          font:14px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
 
-  /* ── splash ── */
+  /* splash */
   #splash {
     position:fixed; inset:0; background:#0a1a0a;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     cursor:pointer; z-index:999;
-    animation: none;
   }
   #splash.hide { animation: fadeOut .5s forwards; }
   @keyframes fadeOut { to { opacity:0; pointer-events:none; } }
-
   .splash-logo {
-    font-family: var(--mono);
-    font-size: clamp(48px, 10vw, 96px);
-    font-weight: 700;
-    color: #00ff88;
-    letter-spacing: 8px;
-    text-shadow: 0 0 40px #00ff8866, 0 0 80px #00ff8833;
-    animation: pulse 2s ease-in-out infinite;
+    font-family:var(--mono); font-size:clamp(48px,10vw,96px); font-weight:700;
+    color:#00ff88; letter-spacing:8px;
+    text-shadow:0 0 40px #00ff8866,0 0 80px #00ff8833;
+    animation:pulse 2s ease-in-out infinite;
   }
   @keyframes pulse {
-    0%,100% { text-shadow: 0 0 40px #00ff8866, 0 0 80px #00ff8833; }
-    50%      { text-shadow: 0 0 60px #00ff88aa, 0 0 120px #00ff8855; }
+    0%,100%{text-shadow:0 0 40px #00ff8866,0 0 80px #00ff8833;}
+    50%{text-shadow:0 0 60px #00ff88aa,0 0 120px #00ff8855;}
   }
-  .splash-sub {
-    font-family: var(--mono);
-    color: #00cc66;
-    font-size: 13px;
-    letter-spacing: 3px;
-    margin-top: 18px;
-    opacity: .7;
-  }
-  .splash-hint {
-    font-family: var(--mono);
-    color: #336644;
-    font-size: 11px;
-    letter-spacing: 2px;
-    margin-top: 48px;
-    animation: blink 1.2s step-end infinite;
-  }
+  .splash-sub { font-family:var(--mono); color:#00cc66; font-size:13px;
+                letter-spacing:3px; margin-top:18px; opacity:.7; }
+  .splash-hint { font-family:var(--mono); color:#336644; font-size:11px;
+                 letter-spacing:2px; margin-top:48px;
+                 animation:blink 1.2s step-end infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
-  /* ── app shell (hidden until splash dismissed) ── */
   #shell { display:none; min-height:100vh; }
 
-  /* ── header ── */
+  /* header */
   header {
     background:var(--card); border-bottom:1px solid var(--line);
     padding:0 24px; height:52px;
     display:flex; align-items:center; gap:16px;
     position:sticky; top:0; z-index:10;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
   }
   .logo { font-family:var(--mono); font-size:17px; font-weight:700;
           color:var(--teal); letter-spacing:2px; }
@@ -76,13 +59,27 @@
   .hbtn {
     font:inherit; border:1px solid var(--line); background:var(--card);
     color:var(--ink); padding:6px 14px; border-radius:6px; cursor:pointer;
-    font-size:13px; transition: all .15s;
+    font-size:13px; transition:all .15s;
   }
   .hbtn:hover { border-color:var(--teal); color:var(--teal); background:var(--teal-light); }
   .hbtn.primary { background:var(--teal); color:#fff; border-color:var(--teal); }
   .hbtn.primary:hover { background:#0d6560; }
 
-  /* ── ask bar ── */
+  /* tabs */
+  .tabs {
+    background:var(--card); border-bottom:1px solid var(--line);
+    padding:0 24px; display:flex; gap:0;
+  }
+  .tab {
+    font:inherit; font-size:13px; font-weight:500;
+    border:none; background:none; color:var(--dim);
+    padding:12px 18px; cursor:pointer; border-bottom:2px solid transparent;
+    transition:all .15s; display:flex; align-items:center; gap:6px;
+  }
+  .tab:hover { color:var(--ink); }
+  .tab.on { color:var(--teal); border-bottom-color:var(--teal); }
+
+  /* ask bar */
   #askbar {
     background:var(--card); border-bottom:1px solid var(--line);
     padding:10px 24px; display:flex; gap:10px; align-items:center;
@@ -90,34 +87,32 @@
   #askbar input {
     flex:1; max-width:520px; padding:8px 12px;
     border:1px solid var(--line); border-radius:6px; font:inherit; font-size:13px;
-    transition: border-color .15s;
+    transition:border-color .15s;
   }
   #askbar input:focus { outline:none; border-color:var(--teal); }
   #ans { color:var(--dim); font-size:13px; flex:1; }
 
-  /* ── main ── */
   main { max-width:1140px; margin:0 auto; padding:24px; }
 
-  /* ── tiles ── */
+  /* tiles */
   .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px; }
   .tile {
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     padding:16px 18px; position:relative; overflow:hidden;
   }
-  .tile::before {
-    content:''; position:absolute; top:0; left:0; right:0; height:3px;
-    background:var(--line);
-  }
+  .tile::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--line); }
   .tile.good::before { background:var(--green); }
   .tile.warn::before { background:var(--amber); }
   .tile.info::before { background:var(--teal); }
+  .tile.blue::before { background:var(--blue); }
   .tile .n { font-size:26px; font-weight:700; line-height:1.2; }
   .tile .l { color:var(--dim); font-size:12px; margin-top:4px; }
   .tile.good .n { color:var(--green); }
   .tile.warn .n { color:var(--amber); }
   .tile.info .n { color:var(--teal); }
+  .tile.blue .n { color:var(--blue); }
 
-  /* ── strip ── */
+  /* strip */
   .strip {
     background:var(--card); border:1px solid var(--line); border-radius:10px;
     padding:12px 18px; margin-bottom:14px;
@@ -127,17 +122,16 @@
   .strip-item b { color:var(--teal); }
   .badge { font-size:12px; padding:3px 10px; border-radius:20px;
            background:var(--green-light); color:var(--green); font-weight:600; }
+  .badge.warn { background:var(--amber-light); color:var(--amber); }
   .score {
     font-size:13px; padding:5px 14px; border-radius:20px;
     background:var(--teal); color:#fff; font-weight:700; letter-spacing:.3px;
     margin-left:auto;
   }
 
-  /* ── panel ── */
-  .panel {
-    background:var(--card); border:1px solid var(--line); border-radius:10px;
-    overflow:hidden; margin-bottom:14px;
-  }
+  /* panel */
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:10px;
+           overflow:hidden; margin-bottom:14px; }
   .panel-head {
     font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px;
     color:var(--dim); padding:11px 18px; border-bottom:1px solid var(--line);
@@ -147,12 +141,12 @@
   .filters button {
     font:inherit; padding:3px 11px; font-size:12px; border-radius:5px;
     border:1px solid var(--line); background:var(--card); color:var(--dim); cursor:pointer;
-    transition: all .15s;
+    transition:all .15s;
   }
   .filters button:hover { border-color:var(--teal); color:var(--teal); }
   .filters button.on { background:var(--teal); color:#fff; border-color:var(--teal); }
 
-  /* ── table ── */
+  /* table */
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th,td { text-align:left; padding:10px 18px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { color:var(--dim); font-weight:600; font-size:11.5px; background:#fafbfc; }
@@ -161,46 +155,58 @@
   .pill { font-size:11px; padding:2px 9px; border-radius:20px; font-weight:700; white-space:nowrap; }
   .pill.resolved { background:var(--green-light); color:var(--green); }
   .pill.escalate { background:var(--amber-light); color:var(--amber); }
+  .pill.flag { background:var(--red-light); color:var(--red); }
+  .pill.ok { background:var(--green-light); color:var(--green); }
+  .pill.low { background:var(--red-light); color:var(--red); }
   .mono { font-family:var(--mono); font-size:12px; color:var(--dim); }
   .ev { color:var(--dim); font-size:11.5px; margin-top:2px; }
   .type-tag {
     font-size:11px; padding:2px 8px; border-radius:4px;
-    background:var(--teal-light); color:var(--teal); font-family:var(--mono);
-    white-space:nowrap;
+    background:var(--teal-light); color:var(--teal); font-family:var(--mono); white-space:nowrap;
   }
+  .num-pos { color:var(--green); font-weight:600; }
+  .num-neg { color:var(--red); font-weight:600; }
+  .num-warn { color:var(--amber); font-weight:600; }
 
-  /* ── confusion matrix ── */
+  /* confusion matrix */
   .matrix-wrap { padding:16px 18px; }
   .matrix-wrap table { max-width:400px; }
   .matrix-wrap th { background:transparent; }
-  .cell-tp { color:var(--green); font-weight:700; font-size:18px; }
-  .cell-tn { color:var(--green); font-weight:700; font-size:18px; }
-  .cell-fp { font-size:18px; }
-  .cell-fn { font-size:18px; }
+  .cell-tp,.cell-tn { color:var(--green); font-weight:700; font-size:18px; }
+  .cell-fp,.cell-fn { font-size:18px; }
 
-  /* ── audit ── */
+  /* audit */
   .audit { padding:10px 18px; }
   .audit-row { padding:7px 0; color:var(--dim); border-bottom:1px dashed var(--line);
                font-size:13px; display:flex; gap:10px; align-items:baseline; }
   .audit-row:last-child { border-bottom:none; }
   .audit-step { font-family:var(--mono); font-size:11.5px; color:var(--teal);
-                background:var(--teal-light); padding:1px 7px; border-radius:4px;
-                white-space:nowrap; }
+                background:var(--teal-light); padding:1px 7px; border-radius:4px; white-space:nowrap; }
 
-  /* ── loading ── */
+  /* forecast chart */
+  .chart-wrap { padding:18px; overflow-x:auto; }
+  .bar-chart { display:flex; align-items:flex-end; gap:6px; height:120px; }
+  .bar-col { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; min-width:36px; }
+  .bar {
+    width:100%; border-radius:4px 4px 0 0; transition:opacity .15s;
+    position:relative; cursor:default;
+  }
+  .bar:hover { opacity:.8; }
+  .bar-label { font-size:10px; color:var(--dim); white-space:nowrap; }
+  .bar-val { font-size:10px; font-weight:600; }
+
   .loading { padding:40px; text-align:center; color:var(--dim); font-size:13px; }
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 </style>
 </head>
 <body>
 
-<!-- SPLASH -->
 <div id="splash">
   <div class="splash-logo">KASH</div>
   <div class="splash-sub">payments reconciliation engine</div>
   <div class="splash-hint">press any key or click to continue</div>
 </div>
 
-<!-- APP -->
 <div id="shell">
   <header>
     <div class="logo">K<span>ash</span></div>
@@ -208,6 +214,12 @@
     <span class="spacer"></span>
     <button class="hbtn primary" id="run">Run close</button>
   </header>
+
+  <nav class="tabs">
+    <button class="tab on" data-tab="recon">⚖️ Reconciliation</button>
+    <button class="tab" data-tab="forecast">📈 Cash Forecast</button>
+    <button class="tab" data-tab="tax">🧾 Tax Matcher</button>
+  </nav>
 
   <div id="askbar">
     <input id="q" placeholder="Ask: what needs review · STL-00007 · unresolved value · fee mismatches">
@@ -219,7 +231,7 @@
 </div>
 
 <script>
-/* ── splash ── */
+/* splash */
 function dismissSplash() {
   const s = document.getElementById('splash');
   s.classList.add('hide');
@@ -229,47 +241,58 @@ function dismissSplash() {
 document.getElementById('splash').addEventListener('click', dismissSplash);
 document.addEventListener('keydown', dismissSplash, { once: true });
 
-/* ── app ── */
 const inr = x => '₹' + Math.round(x).toLocaleString('en-IN');
-let data = null, filter = 'all';
+const pct = x => (x >= 0 ? '+' : '') + x.toFixed(2);
+let reconData = null, forecastData = null, taxData = null;
+let filter = 'all', activeTab = 'recon';
+
+/* tabs */
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    activeTab = t.dataset.tab;
+    renderTab();
+  };
+});
 
 async function runClose() {
   document.getElementById('app').innerHTML = '<div class="loading">Running close…</div>';
-  data = await (await fetch('/report.json', { cache: 'no-store' })).json();
-  render();
-}
-
-function render() {
-  const s = data.stats, r = data.resolution, a = data.accuracy;
+  [reconData, forecastData, taxData] = await Promise.all([
+    fetch('/report.json', { cache:'no-store' }).then(r => r.json()),
+    fetch('/forecast', { cache:'no-store' }).then(r => r.json()),
+    fetch('/tax', { cache:'no-store' }).then(r => r.json()),
+  ]);
+  const s = reconData.stats;
   document.getElementById('sub').textContent =
     `finance close · ${s.records} records · ${s.seconds}s`;
+  renderTab();
+}
+
+function renderTab() {
+  if (activeTab === 'recon' && reconData) renderRecon();
+  else if (activeTab === 'forecast' && forecastData) renderForecast();
+  else if (activeTab === 'tax' && taxData) renderTax();
+}
+
+/* ── RECONCILIATION ── */
+function renderRecon() {
+  const s = reconData.stats, r = reconData.resolution, a = reconData.accuracy;
 
   const tiles = `
     <div class="tiles">
-      <div class="tile info">
-        <div class="n">${s.records}</div>
-        <div class="l">records processed</div>
-      </div>
-      <div class="tile good">
-        <div class="n">${s.reconciled_pct}%</div>
-        <div class="l">value reconciled · ${inr(s.reconciled_value)}</div>
-      </div>
-      <div class="tile">
-        <div class="n">${s.exceptions}</div>
-        <div class="l">exceptions found</div>
-      </div>
-      <div class="tile warn">
-        <div class="n">${r.escalated}</div>
-        <div class="l">escalated to human · ${inr(r.escalated_value)}</div>
-      </div>
+      <div class="tile info"><div class="n">${s.records}</div><div class="l">records processed</div></div>
+      <div class="tile good"><div class="n">${s.reconciled_pct}%</div><div class="l">value reconciled · ${inr(s.reconciled_value)}</div></div>
+      <div class="tile"><div class="n">${s.exceptions}</div><div class="l">exceptions found</div></div>
+      <div class="tile warn"><div class="n">${r.escalated}</div><div class="l">escalated to human · ${inr(r.escalated_value)}</div></div>
     </div>
     <div class="strip">
-      <div class="strip-item">auto-resolved <b>${r.auto_resolved}</b> of ${s.exceptions} &nbsp;(${r.auto_resolution_rate}%)</div>
+      <div class="strip-item">auto-resolved <b>${r.auto_resolved}</b> of ${s.exceptions} (${r.auto_resolution_rate}%)</div>
       <div class="strip-item badge">${r.resolved_without_evidence === 0 ? '✓ all resolutions have evidence' : r.resolved_without_evidence + ' resolved without evidence'}</div>
       <div class="score">precision ${a.precision} · recall ${a.recall} · f1 ${a.f1}</div>
     </div>`;
 
-  const rows = data.exceptions
+  const rows = reconData.exceptions
     .filter(e => filter === 'all' || e.status === filter)
     .map(e => `
       <tr>
@@ -296,7 +319,7 @@ function render() {
       </table>
     </div>`;
 
-  const c = data.confusion;
+  const c = reconData.confusion;
   const matrix = `
     <div class="panel">
       <div class="panel-head">Detection vs ground truth · ${c.population} checkable records</div>
@@ -304,16 +327,8 @@ function render() {
         <table>
           <thead><tr><th></th><th>actual: problem</th><th>actual: clean</th></tr></thead>
           <tbody>
-            <tr>
-              <th>flagged</th>
-              <td class="cell-tp">${c.tp}</td>
-              <td class="cell-fp" style="color:${c.fp>0?'var(--red)':'var(--dim)'}">${c.fp}</td>
-            </tr>
-            <tr>
-              <th>not flagged</th>
-              <td class="cell-fn" style="color:${c.fn>0?'var(--red)':'var(--dim)'}">${c.fn}</td>
-              <td class="cell-tn">${c.tn}</td>
-            </tr>
+            <tr><th>flagged</th><td class="cell-tp">${c.tp}</td><td class="cell-fp" style="color:${c.fp>0?'var(--red)':'var(--dim)'}">${c.fp}</td></tr>
+            <tr><th>not flagged</th><td class="cell-fn" style="color:${c.fn>0?'var(--red)':'var(--dim)'}">${c.fn}</td><td class="cell-tn">${c.tn}</td></tr>
           </tbody>
         </table>
       </div>
@@ -323,7 +338,7 @@ function render() {
     <div class="panel">
       <div class="panel-head">Audit trail</div>
       <div class="audit">
-        ${data.audit.map(x => `
+        ${reconData.audit.map(x => `
           <div class="audit-row">
             <span class="audit-step">${x.step}</span>
             <span>${x.detail}</span>
@@ -333,15 +348,141 @@ function render() {
 
   document.getElementById('app').innerHTML = tiles + table + matrix + audit;
   document.querySelectorAll('.filters button').forEach(b =>
-    b.onclick = () => { filter = b.dataset.f; render(); });
+    b.onclick = () => { filter = b.dataset.f; renderRecon(); });
 }
 
+/* ── FORECAST ── */
+function renderForecast() {
+  const f = forecastData, sm = f.summary;
+  const lowFlag = sm.low_cash_days > 0;
+
+  const tiles = `
+    <div class="tiles">
+      <div class="tile info"><div class="n">${inr(sm.closing_balance)}</div><div class="l">closing balance (actual)</div></div>
+      <div class="tile good"><div class="n">${inr(sm.avg_daily_inflow)}</div><div class="l">avg daily inflow</div></div>
+      <div class="tile blue"><div class="n">${inr(sm.pending_inflow)}</div><div class="l">pending settlements</div></div>
+      <div class="tile ${lowFlag?'warn':'good'}"><div class="n">${sm.low_cash_days}</div><div class="l">low-cash days forecast</div></div>
+    </div>`;
+
+  /* bar chart of history + forecast */
+  const allDays = [...f.history.slice(-14), ...f.forecast];
+  const maxVal = Math.max(...allDays.map(d => Math.abs(d.balance ?? d.projected_balance)));
+  const bars = allDays.map((d, i) => {
+    const isProj = i >= f.history.slice(-14).length;
+    const val = d.balance ?? d.projected_balance;
+    const h = Math.max(4, Math.round(90 * Math.abs(val) / (maxVal || 1)));
+    const color = isProj ? (d.low_cash ? 'var(--red)' : 'var(--blue)') : 'var(--teal)';
+    const label = d.date.slice(5); // MM-DD
+    return `
+      <div class="bar-col">
+        <div class="bar-val" style="color:${color};font-size:9px">${inr(val)}</div>
+        <div class="bar" style="height:${h}px;background:${color};opacity:${isProj?'.6':'1'}"></div>
+        <div class="bar-label">${label}${isProj?' ◦':''}</div>
+      </div>`;
+  }).join('');
+
+  const chart = `
+    <div class="panel">
+      <div class="panel-head">📈 Cash position — last 14 days (solid) + ${sm.forecast_days}-day forecast (hollow · red = low cash)</div>
+      <div class="chart-wrap"><div class="bar-chart">${bars}</div></div>
+    </div>`;
+
+  /* forecast table */
+  const frows = f.forecast.map(d => `
+    <tr>
+      <td>${d.date}</td>
+      <td class="${d.expected_inflow >= 0 ? 'num-pos' : 'num-neg'}">${inr(d.expected_inflow)}</td>
+      <td class="${d.projected_balance < sm.threshold ? 'num-neg' : 'num-pos'}">${inr(d.projected_balance)}</td>
+      <td><span class="pill ${d.low_cash ? 'low' : 'ok'}">${d.low_cash ? '⚠ low cash' : 'ok'}</span></td>
+    </tr>`).join('');
+
+  const ftable = `
+    <div class="panel">
+      <div class="panel-head">7-day projection · threshold ${inr(sm.threshold)}</div>
+      <table>
+        <thead><tr><th>Date</th><th>Expected inflow</th><th>Projected balance</th><th>Status</th></tr></thead>
+        <tbody>${frows}</tbody>
+      </table>
+    </div>`;
+
+  /* history table */
+  const hrows = f.history.slice(-10).reverse().map(d => `
+    <tr>
+      <td>${d.date}</td>
+      <td class="${d.net >= 0 ? 'num-pos' : 'num-neg'}">${inr(d.net)}</td>
+      <td>${inr(d.balance)}</td>
+    </tr>`).join('');
+
+  const htable = `
+    <div class="panel">
+      <div class="panel-head">Recent cash history (last 10 days)</div>
+      <table>
+        <thead><tr><th>Date</th><th>Net movement</th><th>Running balance</th></tr></thead>
+        <tbody>${hrows}</tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('app').innerHTML = tiles + chart + `<div class="two-col">${ftable}${htable}</div>`;
+}
+
+/* ── TAX MATCHER ── */
+function renderTax() {
+  const t = taxData, sm = t.summary;
+
+  const tiles = `
+    <div class="tiles">
+      <div class="tile info"><div class="n">${sm.settlements_checked}</div><div class="l">settlements checked</div></div>
+      <div class="tile good"><div class="n">${inr(sm.total_expected_gst)}</div><div class="l">expected GST</div></div>
+      <div class="tile ${Math.abs(sm.total_gst_variance) > 1 ? 'warn' : 'good'}">
+        <div class="n">${inr(sm.total_charged_gst)}</div><div class="l">charged GST</div>
+      </div>
+      <div class="tile ${sm.flagged_lines > 0 ? 'warn' : 'good'}">
+        <div class="n">${sm.flagged_lines}</div><div class="l">flagged lines (variance &gt; ₹${sm.tolerance})</div>
+      </div>
+    </div>
+    <div class="strip">
+      <div class="strip-item">total GST variance <b class="${Math.abs(sm.total_gst_variance)>1?'num-warn':''}">${inr(sm.total_gst_variance)}</b></div>
+      <div class="strip-item badge ${sm.flagged_lines>0?'warn':''}">${sm.flagged_lines === 0 ? '✓ all lines within tolerance' : sm.flagged_lines + ' lines need review'}</div>
+    </div>`;
+
+  const rows = t.lines.map(l => `
+    <tr style="${l.flag ? 'background:var(--amber-light)' : ''}">
+      <td class="mono">${l.settlement_id}</td>
+      <td>${l.settled_at}</td>
+      <td>${l.payments}</td>
+      <td>${inr(l.expected_fee)}</td>
+      <td class="${Math.abs(l.fee_variance)>0.5?'num-warn':''}">${inr(l.charged_fee)}</td>
+      <td>${inr(l.expected_gst)}</td>
+      <td class="${Math.abs(l.gst_variance)>sm.tolerance?'num-neg':''}">${inr(l.charged_gst)}</td>
+      <td class="${l.gst_variance>0?'num-neg':l.gst_variance<0?'num-pos':''}">${pct(l.gst_variance)}</td>
+      <td class="${Math.abs(l.cumulative_gst_variance)>5?'num-warn':''}">${pct(l.cumulative_gst_variance)}</td>
+      <td><span class="pill ${l.flag?'flag':'ok'}">${l.flag ? '⚠ flag' : '✓ ok'}</span></td>
+    </tr>`).join('');
+
+  const table = `
+    <div class="panel">
+      <div class="panel-head">🧾 GST reconciliation by settlement · FEE_RATE 2% · GST 18%</div>
+      <table>
+        <thead><tr>
+          <th>Settlement</th><th>Date</th><th>Pmts</th>
+          <th>Exp. fee</th><th>Charged fee</th>
+          <th>Exp. GST</th><th>Charged GST</th>
+          <th>Variance</th><th>Cumulative</th><th>Status</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('app').innerHTML = tiles + table;
+}
+
+/* ask */
 async function ask() {
   const q = document.getElementById('q').value.trim();
   if (!q) return;
   const ans = document.getElementById('ans');
   ans.textContent = '…';
-  const res = await (await fetch('/ask?q=' + encodeURIComponent(q))).json();
+  const res = await fetch('/ask?q=' + encodeURIComponent(q)).then(r => r.json());
   ans.textContent = res.answer;
 }
 document.getElementById('ask').onclick = ask;

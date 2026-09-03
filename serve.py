@@ -7,7 +7,9 @@ from urllib.parse import parse_qs, urlparse
 
 import generate
 from ask import answer
+from forecast import forecast
 from run import build
+from tax import tax_reconcile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8000
@@ -26,6 +28,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path == "/report.json":
             return self._json(build())
+        if path == "/forecast":
+            return self._json(forecast())
+        if path == "/tax":
+            return self._json(tax_reconcile())
         if path == "/ask":
             q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
             return self._json({"answer": answer(q, build())})

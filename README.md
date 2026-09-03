@@ -1,50 +1,29 @@
 # Kash
 
-A reconciliation engine for a payments merchant. It follows the money from an
-order to its gateway payment, through any refund, into a settlement batch, and
-out to the bank credit — and flags whatever doesn't line up.
+A finance controller for a payments merchant. It closes the full reconciliation
+loop, forecasts the cash position, and reconciles every tax line — all
+deterministically, in under 2ms, with measured accuracy.
 
-Finance teams mostly do this by hand in spreadsheets. Kash runs it in one
-command, decides which exceptions it can clear on its own, escalates the rest,
-and keeps a full audit trail.
+## What it does
 
-## What it checks
+**Multi-source reconciliation** — follows money from order → payment → refund →
+settlement → bank credit across 6 sources. Flags every discrepancy as a typed
+exception with a reason and recommended action. Auto-resolves what it can prove,
+escalates the rest.
 
-- Orders that were never paid
-- Payments captured but not yet settled
-- Gateway fee or GST that doesn't match the expected working
-- Refunds that weren't netted off the payout
-- Settlement batches whose payout never reached the bank, or arrived short
-- Bank credits with no settlement behind them
-- Duplicate payouts and chargebacks
+**Forward cash forecaster** — builds the actual daily cash position from the bank
+statement, projects the next 7 days using a weighted average of recent inflows,
+incorporates pending settlements as known future credits, and flags any day where
+the projected balance drops below the low-cash threshold.
 
-## How it works
-
-Six sources are matched in passes: orders, payments, refunds, settlements,
-reserves, and the bank statement. A payout on a settlement is
-gross − fee − GST − refunds, so it is checked against its own components before
-being tied to a bank credit.
-
-Matching uses exact keys first (order id, UTR). When the bank feed is noisy —
-garbled UTR, truncated reference, character substitution like `0`→`O`, or a
-date-shifted credit — the engine falls back to fuzzy UTR matching (truncation
-and non-digit substitutions only, to avoid false matches on sequential UTRs),
-then to amount + date window as a last resort.
-
-Anything that doesn't tie out becomes a typed exception with a reason. Kash then
-tries to clear each one, but only with evidence: a payout short by exactly a
-documented reserve is cleared; a shortfall it can't account for is escalated to
-a human rather than guessed.
-
-The LLM layer (`llm.py`, `ask.py`) is strictly optional and offline by default.
-Set `GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENAI_API_KEY` to enable it. When
-active, it only investigates and explains — the engine does all the math
-deterministically and the score is identical with or without it.
+**Tax-line matcher** — for every settlement period, computes expected GST (18% on
+the 2% gateway fee) from payment-level data, matches against what was actually
+charged, tracks cumulative drift, and flags any line where the variance exceeds
+tolerance.
 
 ## Accuracy
 
-The books are synthetic and seeded, and ship with a ground-truth file so the
-matcher is scored on real precision and recall — on genuinely hard data:
+Scored against a planted ground-truth file on genuinely hard data:
 
 | Anomaly type | Planted | Caught |
 |---|---|---|
@@ -62,9 +41,8 @@ matcher is scored on real precision and recall — on genuinely hard data:
 
     precision 1.0  ·  recall 1.0  ·  f1 1.0  (838 checkable records, 0 false positives)
 
-Hard cases in the data: garbled UTRs, near-miss amounts (±₹0.01–0.04),
-date-shifted bank credits (+2 days), noisy narrations, and duplicate payouts on
-fuzzy-matched entries.
+Hard cases: garbled UTRs, near-miss amounts (±₹0.01–0.04), date-shifted bank
+credits (+2 days), noisy narrations, duplicate payouts on fuzzy-matched entries.
 
 ## Run it
 
@@ -83,16 +61,23 @@ Sample output:
     detection accuracy vs truth -> precision 1.0  recall 1.0  f1 1.0
     confusion (over 838 checkable records) -> TP 84  FP 0  FN 0  TN 754
 
-## Files
+## Architecture
 
     generate.py    synthetic books + ground truth (hard anomalies seeded)
-    reconcile.py   matching engine (exact → fuzzy UTR → amount+date)
-    resolve.py     clears safe exceptions, escalates the rest
-    score.py       precision / recall against the truth
-    run.py         end to end (writes report.json)
-    ask.py         answers plain questions about the close
-    llm.py         optional LLM helper (Gemini / Groq / OpenAI)
-    serve.py       serves the dashboard
-    dashboard.html the finance close view
+    reconcile.py   matching engine (exact UTR → fuzzy UTR → amount+date)
+    resolve.py     clears safe exceptions with evidence, escalates the rest
+    score.py       precision / recall against the truth file
+    run.py         end-to-end pipeline (writes report.json)
+    forecast.py    daily cash position + 7-day weighted projection
+    tax.py         per-settlement GST reconciliation with variance tracking
+    ask.py         plain-English Q&A over the close (deterministic + optional LLM)
+    llm.py         optional LLM helper (Gemini / Groq / OpenAI) — off by default
+    serve.py       HTTP server — /report.json · /forecast · /tax · /ask
+    dashboard.html reconciliation · cash forecast · tax matcher tabs
+
+The LLM layer is strictly optional and offline by default. Set `GEMINI_API_KEY`,
+`GROQ_API_KEY`, or `OPENAI_API_KEY` to enable it. It only investigates and
+explains — the engine does all the math deterministically and the score is
+identical with or without it.
 
 Pure Python, no dependencies.
